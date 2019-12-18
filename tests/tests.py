@@ -167,6 +167,7 @@ class AdminTest(TestCase):
 
 class SessionStoreTest(TestCase):
     def setUp(self):
+        self.user = User.objects.create_superuser('bouke', '', 'secret')
         self.store = SessionStore(user_agent='Python/2.7', ip='127.0.0.1')
 
     def test_untouched_init(self):
@@ -181,40 +182,40 @@ class SessionStoreTest(TestCase):
         self.store.get(auth.SESSION_KEY)
         self.assertFalse(self.store.modified)
 
-        self.store[auth.SESSION_KEY] = 1
+        self.store[auth.SESSION_KEY] = self.user.id
         self.assertTrue(self.store.modified)
 
     def test_save(self):
-        self.store[auth.SESSION_KEY] = 1
+        self.store[auth.SESSION_KEY] = self.user.id
         self.store.save()
 
         session = Session.objects.get(pk=self.store.session_key)
         self.assertEqual(session.user_agent, 'Python/2.7')
         self.assertEqual(session.ip, '127.0.0.1')
-        self.assertEqual(session.user_id, 1)
+        self.assertEqual(session.user_id, self.user.id)
         self.assertAlmostEqual(now(), session.last_activity,
                                delta=timedelta(seconds=5))
 
     def test_load_unmodified(self):
-        self.store[auth.SESSION_KEY] = 1
+        self.store[auth.SESSION_KEY] = self.user.id
         self.store.save()
         store2 = SessionStore(session_key=self.store.session_key,
                               user_agent='Python/2.7', ip='127.0.0.1')
         store2.load()
         self.assertEqual(store2.user_agent, 'Python/2.7')
         self.assertEqual(store2.ip, '127.0.0.1')
-        self.assertEqual(store2.user_id, 1)
+        self.assertEqual(store2.user_id, self.user.id)
         self.assertEqual(store2.modified, False)
 
     def test_load_modified(self):
-        self.store[auth.SESSION_KEY] = 1
+        self.store[auth.SESSION_KEY] = self.user.id
         self.store.save()
         store2 = SessionStore(session_key=self.store.session_key,
                               user_agent='Python/3.3', ip='8.8.8.8')
         store2.load()
         self.assertEqual(store2.user_agent, 'Python/3.3')
         self.assertEqual(store2.ip, '8.8.8.8')
-        self.assertEqual(store2.user_id, 1)
+        self.assertEqual(store2.user_id, self.user.id)
         self.assertEqual(store2.modified, True)
 
     def test_duplicate_create(self):
@@ -255,14 +256,15 @@ class SessionStoreTest(TestCase):
 
 class ModelTest(TestCase):
     def test_get_decoded(self):
+        user = User.objects.create_superuser('bouke', '', 'secret')
         store = SessionStore(user_agent='Python/2.7', ip='127.0.0.1')
-        store[auth.SESSION_KEY] = 1
+        store[auth.SESSION_KEY] = user.id
         store['foo'] = 'bar'
         store.save()
 
         session = Session.objects.get(pk=store.session_key)
         self.assertEqual(session.get_decoded(),
-                         {'foo': 'bar', auth.SESSION_KEY: 1})
+                         {'foo': 'bar', auth.SESSION_KEY: user.id})
 
     def test_very_long_ua(self):
         ua = 'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.1; WOW64; ' \
