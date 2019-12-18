@@ -1,22 +1,17 @@
 import time
 
 from django.conf import settings
+from django.contrib.sessions import middleware as base_session_middleware
 from django.utils.cache import patch_vary_headers
-from django.utils.http import cookie_date
+from django.utils.http import http_date
 
 try:
     from importlib import import_module
 except ImportError:
     from django.utils.importlib import import_module
 
-try:
-    from django.utils.deprecation import MiddlewareMixin
-except ImportError:
-    class MiddlewareMixin(object):
-        pass
 
-
-class SessionMiddleware(MiddlewareMixin):
+class SessionMiddleware(base_session_middleware.SessionMiddleware):
     """
     Middleware that provides ip and user_agent to the session store.
     """
@@ -49,7 +44,7 @@ class SessionMiddleware(MiddlewareMixin):
                 else:
                     max_age = request.session.get_expiry_age()
                     expires_time = time.time() + max_age
-                    expires = cookie_date(expires_time)
+                    expires = http_date(expires_time)
                 # Save the session data and refresh the client cookie.
                 # Skip session save for 500 responses, refs #3881.
                 if response.status_code != 500:
